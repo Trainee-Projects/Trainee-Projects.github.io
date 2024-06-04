@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Review</title>
+        <!-- include bootstrap -->
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <style>
+            .container {
+                margin-top: 50px;
+            }
+            .review {
+                margin-bottom: 20px;
+            }
+            .review textarea {
+                width: 100%;
+                height: 100px;
+            }
+            .result {
+                margin-top: 20px;
+            }
+            .loader {
+                border: 16px solid #f3f3f3;
+                border-top: 16px solid #3498db;
+                border-radius: 50%;
+                width: 120px;
+                height: 120px;
+                animation: spin 2s linear infinite;
+            }
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <!-- get review and assess through gcp sentiment api and print the result in the below page -->
+            <!-- use jquery ajax to call the api, the api token should be taken from local storage add a loader that should load while api requested -->
+            <h1>Analyse Review</h1>
+            <div class="review">
+                <textarea id="review" class="form-control" placeholder="Enter your review"></textarea>
+                <button id="submit" class="btn btn-primary col-1 my-2 offset-11">Submit</button>
+            </div>
+            <!-- design the below form in bootstrap -->
+            <div class="result">
+                <div id="result"></div>
+            </div>
+        </div>
+        <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+        <script>
+            $(document).ready(function() {
+                const key = localStorage.getItem('gcpkey');
+                $('#submit').click(function() {
+                    var review = $('#review').val();
+                    if (review && key) {
+                        $('#result').html('<div class="loader"></div>');
+                        $.ajax({
+                            url: 'https://language.googleapis.com/v1/documents:analyzeSentiment?key='+key,
+                            type: 'POST',
+                            data: JSON.stringify({
+                                document:{
+                                    type:"PLAIN_TEXT",
+                                    content: review
+                                },
+                                encodingType: "UTF8"
+                            }),
+                            contentType: 'application/json',
+                            success: function(response) {
+                                // print the score as progress bar and magnitude as a text
+                                // print the score as text if zero it's neutral, if greater than zero and less than .5 it's good and if greater than .5 it's excellent and if less than zero and greater than -.5 it's bad and if less than -.5 it's worst
+                                var score = response.documentSentiment.score;
+                                var resultText = 'Neutral';
+                                var color = 'black';
+                                if (score > 0) {
+                                    color = score < 0.5 ? 'lightgreen' : 'green';
+                                    resultText = score < 0.5 ? 'Good' : 'Excellent';
+                                } else if (score < 0) {
+                                    color = score >= -0.5 ? 'pink' : 'red';
+                                    resultText = score >= -0.5 ? 'Bad' : 'Worst';
+                                }
+                                // design the results in bootstrap
+                                $('#result').html('<p>Score: <span style="color: ' + color + ';">' + score + '</span>, Result: <span style="color: ' + color + ';">' + resultText + '</span></p>');
+                                // print all the sentence array in the response sentiment, magnitude and the sentence one by one in a loop
+                                // print the score in red if it is negative, green if it is positive and black if it is neutral
+                                $.each(response.sentences, function(index, sentence) {
+                                    var color = 'black';
+                                    color = sentence.sentiment.score === 0 ? 'info' : sentence.sentiment.score > 0 ? 'success' : 'danger';
+                                    // print the text in alert box with color
+                                    $('#result').append('<div class="alert alert-'+color+'" role="alert">' + sentence.text.content + ' <span class="badge badge-info"> Score: ' + sentence.sentiment.score +'</span></div>');
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+        </script>
+    </body>
+</html>
